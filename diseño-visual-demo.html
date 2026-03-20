@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Diseño Conceptual - Café POS</title>
+  <!-- Usando fuente sans-serif moderna y legible -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* 
+     * PALETA DE COLORES "CAFÉ & MADERA CLARA" 
+     * Tonos cálidos, lisos, sin texturas pesadas.
+     */
+    :root {
+      --bg-cream: #FDFBF7;        /* Fondo hueso/crema muy claro */
+      --wood-light: #EBE1D5;      /* Madera pino/haya claro (para tarjetas) */
+      --wood-medium: #C8A98B;     /* Madera roble claro (para bordes o acentos sutiles) */
+      --coffee-brown: #5C3D2E;    /* Marrón café tostado (para textos principales y botones primarios) */
+      --coffee-dark: #382218;     /* Marrón muy oscuro (para títulos) */
+      --text-muted: #8A7363;      /* Texto secundario cálido */
+      --accent-red: #D9534F;      /* Rojo suave para alertas de bajo stock */
+      --accent-green: #6B8E23;    /* Verde oliva suave para éxito/entradas */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-cream);
+      color: var(--coffee-dark);
+      line-height: 1.5;
+      padding-bottom: 80px; /* Espacio para el nav inferior */
+    }
+
+    h1, h2, h3 {
+      font-family: 'Merriweather', serif;
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    /* HEADER */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 2rem;
+    }
+    .header-icon {
+      background-color: var(--coffee-brown);
+      color: var(--bg-cream);
+      padding: 10px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(92, 61, 46, 0.15);
+    }
+    .header h1 {
+      font-size: 1.5rem;
+      color: var(--coffee-dark);
+    }
+
+    /* SEARCH BAR */
+    .search-bar {
+      position: relative;
+      margin-bottom: 1.5rem;
+    }
+    .search-bar input {
+      width: 100%;
+      padding: 14px 16px 14px 44px;
+      border-radius: 16px;
+      border: 1px solid var(--wood-medium);
+      background-color: rgba(255, 255, 255, 0.8);
+      color: var(--coffee-dark);
+      font-size: 1rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-bar input:focus {
+      border-color: var(--coffee-brown);
+      box-shadow: 0 0 0 3px rgba(92, 61, 46, 0.1);
+    }
+    .search-bar i {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+    }
+
+    /* PRODUCT CARD (Listado) */
+    .card-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .card {
+      background-color: #FFFFFF;
+      border: 1px solid var(--wood-light);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(200, 169, 139, 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: transform 0.2s;
+    }
+    .card:active {
+      transform: scale(0.98);
+    }
+    .card-red {
+      background-color: #FFF9F8;
+      border-color: #F8D7D6;
+    }
+    
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--coffee-dark);
+    }
+    .card-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .badge-alert {
+      background-color: #FDE8E7;
+      color: var(--accent-red);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .card-body {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--wood-light);
+      padding: 8px 12px;
+      border-radius: 12px;
+    }
+    .quantity-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+    .quantity {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--coffee-dark);
+    }
+    .quantity.alert {
+      color: var(--accent-red);
+    }
+    .unit {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-action {
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #fff;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    .btn-action:active { transform: scale(0.9); }
+    
+    .btn-minus {
+      background-color: var(--wood-medium);
+      color: var(--coffee-dark);
+    }
+    .btn-plus {
+      background-color: var(--coffee-brown);
+      box-shadow: 0 4px 8px rgba(92, 61, 46, 0.2);
+    }
+
+    /* BOTTOM NAV BAR */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background-color: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid var(--wood-light);
+      display: flex;
+      justify-content: space-around;
+      padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+      box-shadow: 0 -4px 20px rgba(200, 169, 139, 0.1);
+      z-index: 100;
+    }
+    
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--wood-medium);
+      text-decoration: none;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      transition: color 0.3s;
+      width: 70px;
+    }
+    .nav-item.active {
+      color: var(--coffee-brown);
+    }
+    .nav-item.active i svg {
+      stroke-width: 2.5px;
+    }
+    .nav-indicator {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background-color: transparent;
+      margin-top: 2px;
+    }
+    .nav-item.active .nav-indicator {
+      background-color: var(--coffee-brown);
+    }
+
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- Header -->
+    <header class="header">
+      <div class="header-icon">
+        <i data-lucide="coffee" width="24" height="24"></i>
+      </div>
+      <h1>Inventario</h1>
+    </header>
+
+    <!-- Search -->
+    <div class="search-bar">
+      <i data-lucide="search" width="20" height="20"></i>
+      <input type="text" placeholder="Buscar insumo (ej. Leche)...">
+    </div>
+
+    <!-- Inventory List -->
+    <div class="card-list">
+      
+      <!-- Card 1: Normal Status -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Granos de Café (Arabica)</div>
+            <div class="card-subtitle">Insumo Base • Mín: 5 kg</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="quantity-wrap">
+            <span class="quantity">12.5</span>
+            <span class="unit">kg</span>
+          </div>
+          <div class="actions">
+            <button class="btn-action btn-minus"><i data-lucide="minus"></i></button>
+            <button class="btn-action btn-plus"><i data-lucide="plus"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Low Stock Alert -->
+      <div class="card card-red">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Leche de Avena</div>
+            <div class="card-subtitle">Lácteos Vegetales • Mín: 6 L</div>
+          </div>
+          <div class="badge-alert">
+            <i data-lucide="alert-circle" width="14" height="14"></i>
+            Bajo Stock
+          </div>
+        </div>
+        <div class="card-body" style="background-color: #F8D7D6;">
+          <div class="quantity-wrap">
+            <span class="quantity alert">3.0</span>
+            <span class="unit" style="color: var(--accent-red);">L</span>
+          </div>
+          <div class="actions">
+            <button class="btn-action btn-minus" style="background-color: #E2B2B1; color: var(--coffee-brown)"><i data-lucide="minus"></i></button>
+            <button class="btn-action btn-plus"><i data-lucide="plus"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Normal Status -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Sirope de Vainilla</div>
+            <div class="card-subtitle">Complementos • Mín: 2 bot.</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="quantity-wrap">
+            <span class="quantity">5</span>
+            <span class="unit">botellas</span>
+          </div>
+          <div class="actions">
+            <button class="btn-action btn-minus"><i data-lucide="minus"></i></button>
+            <button class="btn-action btn-plus"><i data-lucide="plus"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Normal Status -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Vasos de Cartón (8oz)</div>
+            <div class="card-subtitle">Descartables • Mín: 50 un.</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="quantity-wrap">
+            <span class="quantity">120</span>
+            <span class="unit">un.</span>
+          </div>
+          <div class="actions">
+            <button class="btn-action btn-minus"><i data-lucide="minus"></i></button>
+            <button class="btn-action btn-plus"><i data-lucide="plus"></i></button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <a href="#" class="nav-item active">
+      <i><i data-lucide="coffee"></i></i>
+      STOCK
+      <div class="nav-indicator"></div>
+    </a>
+    <a href="#" class="nav-item">
+      <i><i data-lucide="package-plus"></i></i>
+      ENTRADAS
+      <div class="nav-indicator"></div>
+    </a>
+    <a href="#" class="nav-item">
+      <i><i data-lucide="bar-chart-2"></i></i>
+      REPORTES
+      <div class="nav-indicator"></div>
+    </a>
+  </nav>
+
+  <!-- Inicializar iconos -->
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
