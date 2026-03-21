@@ -1,0 +1,43 @@
+# ─── Dependencias ──────────────────────────────────────────────────────────
+node_modules
+.npm
+
+# ─── Build outputs ─────────────────────────────────────────────────────────
+dist
+dist-ssr
+
+# ─── Archivos de Docker (evitar recursividad) ──────────────────────────────
+Dockerfile*
+docker-compose*.yml
+nginx.conf
+.dockerignore
+
+# ─── Git ────────────────────────────────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+
+# ─── Logs ───────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ─── Editor y OS ─────────────────────────────────────────────────────────────
+.DS_Store
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+Thumbs.db
+
+# ─── Test y coverage ─────────────────────────────────────────────────────────
+coverage
+*.test.ts
+*.spec.ts
+__tests__
+
+# ─── Docs locales ─────────────────────────────────────────────────────────────
+diseño-visual-demo.html
+README.md
