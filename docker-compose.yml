@@ -1,0 +1,55 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────
+# Barista Stock Manager — Docker Compose
+#
+# Comandos rápidos:
+#   Desarrollo (HMR):    docker compose up dev
+#   Producción (build):  docker compose up prod --build
+#   Limpiar todo:        docker compose down --volumes --rmi local
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Desarrollo ────────────────────────────────────────────────
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: barista-stock-dev
+    ports:
+      # Puerto Vite en el host → puerto Vite en el contenedor
+      - "5173:5173"
+    volumes:
+      # Montar el source code del host para HMR en tiempo real
+      - .:/app
+      # EXCEPCIÓN: node_modules del contenedor no se sobreescribe
+      # con el del host. Cada OS puede tener binarios nativos distintos.
+      - /app/node_modules
+    environment:
+      # Necesario para que Vite detecte cambios de archivo en Linux/Docker
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=300
+      # Modo de Vite
+      - NODE_ENV=development
+    # Reiniciar solo si el contenedor falla, no si se detiene manualmente
+    restart: on-failure
+
+  # ── Producción ────────────────────────────────────────────────
+  prod:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: barista-stock-prod
+    ports:
+      # Acceder en http://localhost:8080
+      - "8080:80"
+    # Sin volúmenes: el bundle está copiado dentro de la imagen
+    restart: unless-stopped
+    # Healthcheck: verifica que nginx responda correctamente
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
