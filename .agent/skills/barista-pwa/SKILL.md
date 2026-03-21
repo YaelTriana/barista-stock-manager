@@ -3,13 +3,24 @@ name: barista-pwa
 description: >
   Usar cuando el agente trabaja en vite.config.ts, configuración de
   vite-plugin-pwa, manifest.webmanifest, service worker, workbox,
-  estrategias de caché, o headers de Content-Security-Policy.
+  vercel.json, o headers de Content-Security-Policy.
   No usar para componentes React o lógica de store.
 ---
 
-# Barista PWA Skill
+# Barista PWA + Deploy Skill
 
-## vite.config.ts — configuración completa
+## Deploy: Vercel (producción) + Docker (desarrollo local)
+
+| Entorno | Comando | URL |
+|---------|---------|-----|
+| Desarrollo | `docker compose up dev` | http://localhost:5173 |
+| Producción | `git push` → Vercel auto-deploy | https://tu-app.vercel.app |
+
+Docker ya NO se usa para producción en v4 — Vercel lo reemplaza.
+
+---
+
+## `vite.config.ts`
 
 ```typescript
 import { defineConfig } from 'vite'
@@ -19,7 +30,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   plugins: [
-    tailwindcss(), // DEBE ir primero (antes de react)
+    tailwindcss(), // PRIMERO — antes de react()
     react(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -28,102 +39,133 @@ export default defineConfig({
         name: 'Gestión Interna de Café',
         short_name: 'CaféPOS',
         description: 'Gestión de inventario privada para cafetería',
-        theme_color: '#5C3D2E',        // coffee-brown
-        background_color: '#FDFBF7',   // bg-cream
+        theme_color: '#5C3D2E',
+        background_color: '#FDFBF7',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
-          {
-            src: '/icons/icon-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: '/icons/icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
-          }
+          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ]
       },
       workbox: {
-        // Solo cachear assets del shell estático
+        // Solo assets estáticos del shell — NUNCA datos del usuario
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // SEGURIDAD: datos del usuario nunca en SW cache
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [
           {
-            // Google Fonts CSS
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'google-fonts-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365
-              },
+              expiration: { maxEntries: 10, maxAgeSeconds: 31_536_000 },
               cacheableResponse: { statuses: [0, 200] }
             }
           },
           {
-            // Google Fonts archivos (woff2)
             urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'gstatic-fonts-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365
-              },
+              expiration: { maxEntries: 10, maxAgeSeconds: 31_536_000 },
               cacheableResponse: { statuses: [0, 200] }
             }
           }
         ]
       },
-      // No habilitar SW en dev para no interferir con HMR
-      devOptions: { enabled: false }
+      devOptions: { enabled: false } // NO activar SW en dev
     })
   ],
 
   server: {
-    host: '0.0.0.0', // REQUERIDO para Docker — no eliminar
+    host: '0.0.0.0', // OBLIGATORIO para Docker HMR
     port: 5173,
+    // Headers en desarrollo — Vercel los aplica en producción via vercel.json
     headers: {
-      // CSP alineada con nginx.conf para paridad dev/prod
       'Content-Security-Policy':
         "default-src 'self'; " +
         "script-src 'self'; " +
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
         "font-src 'self' https://fonts.gstatic.com; " +
         "img-src 'self' data: blob:; " +
-        "connect-src 'self'; " +
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
         "worker-src 'self' blob:;",
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
-      'Referrer-Policy': 'no-referrer'
+      'Referrer-Policy': 'no-referrer',
     }
   }
 })
 ```
 
-## Reglas críticas del Service Worker
+> CRÍTICO: `connect-src` incluye `https://*.supabase.co` y `wss://*.supabase.co`
+> para permitir las llamadas a la API y los WebSockets de Realtime.
 
-**El SW NUNCA debe cachear datos de usuario.** Los datos viven en IndexedDB
-(via localforage) y el SW no tiene acceso a IndexedDB por diseño.
-Lo que sí se cachea: JS, CSS, HTML, íconos, fuentes — el shell estático.
+---
 
-**El SW (sw.js) nunca se cachea en el browser.** Si el browser cachea sw.js,
-`autoUpdate` deja de funcionar. El header `Cache-Control: no-store` en nginx.conf
-ya lo garantiza en producción.
+## `vercel.json`
 
-## Versiones del stack de build
-
+```json
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:;"
+        },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options",        "value": "DENY" },
+        { "key": "Referrer-Policy",        "value": "no-referrer" },
+        { "key": "Permissions-Policy",     "value": "geolocation=(), camera=(), microphone=()" }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/workbox-(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/(.*)\\.webmanifest",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400" },
+        { "key": "Content-Type", "value": "application/manifest+json" }
+      ]
+    }
+  ]
+}
 ```
-vite: ^8.0.0
-vite-plugin-pwa: ^1.2.0
-@tailwindcss/vite: ^4.2.1
-@vitejs/plugin-react: ^6.0.0
+
+## Setup de deploy en Vercel
+
+1. Conectar repo en vercel.com → Import Project
+2. Framework preset: Vite (auto-detectado)
+3. Environment Variables → agregar:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+4. Deploy → cada `git push` a `main` redespliega automáticamente
+
+## `.env.local` en .gitignore
+
+```bash
+# Verificar que .gitignore incluye:
+.env.local
+.env*.local
 ```
+
+Las variables de Supabase NUNCA van al repo. En Vercel se agregan
+manualmente desde el dashboard o CLI.
 
 ## Do not use this skill when
 
