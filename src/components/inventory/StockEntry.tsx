@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { PackagePlus, Save } from 'lucide-react';
-import { useInventoryStore } from '../store/useInventoryStore';
+import { useInventoryStore } from '../../store/useInventoryStore';
 
 export const StockEntry: React.FC = () => {
-  const { products, registerEntry } = useInventoryStore();
-  
+  const products = useInventoryStore((s) => s.products);
+  const registerEntry = useInventoryStore((s) => s.registerEntry);
+  const showToast = useInventoryStore((s) => s.showToast);
+
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState('');
   const [costPrice, setCostPrice] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
 
   const selectedProduct = products.find(p => p.id === selectedProductId);
 
@@ -18,14 +19,12 @@ export const StockEntry: React.FC = () => {
 
     const qtyNumber = parseFloat(quantity);
     const costNumber = costPrice ? parseFloat(costPrice) : undefined;
-    
+
     registerEntry(selectedProductId, qtyNumber, costNumber);
-    
-    // Reset form and show success message
+
     setQuantity('');
     setCostPrice('');
-    setSuccessMsg('¡Entrada registrada con éxito!');
-    setTimeout(() => setSuccessMsg(''), 3000);
+    showToast('¡Entrada registrada con éxito!');
   };
 
   return (
@@ -39,13 +38,13 @@ export const StockEntry: React.FC = () => {
 
       <div className="bg-white p-6 rounded-3xl shadow-[0_2px_8px_rgba(200,169,139,0.1)] border border-wood-light">
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Selección de Producto */}
           <div>
-            <label className="block text-sm font-semibold text-text-muted mb-1.5 ml-1">Producto o Insumo</label>
-            <select 
+            <label htmlFor="entry-product" className="block text-sm font-semibold text-text-muted mb-1.5 ml-1">Producto o Insumo</label>
+            <select
+              id="entry-product"
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
-              className="w-full px-4 py-3.5 rounded-2xl bg-cream border border-wood-medium text-coffee-dark focus:outline-none focus:border-coffee-brown focus:ring-4 focus:ring-coffee-brown/10 appearance-none"
+              className="w-full px-4 py-3.5 rounded-2xl bg-cream border border-wood-medium text-coffee-dark focus:outline-none focus:border-coffee-brown focus:ring-4 focus:ring-coffee-brown/10 appearance-none min-h-[48px]"
               required
             >
               <option value="" disabled>Selecciona un producto...</option>
@@ -55,13 +54,13 @@ export const StockEntry: React.FC = () => {
             </select>
           </div>
 
-          {/* Cantidad y Unidad */}
           <div>
-            <label className="block text-sm font-semibold text-text-muted mb-1.5 ml-1">
+            <label htmlFor="entry-quantity" className="block text-sm font-semibold text-text-muted mb-1.5 ml-1">
               Cantidad Entrante {selectedProduct && `(${selectedProduct.unit})`}
             </label>
-            <input 
-              type="number" 
+            <input
+              id="entry-quantity"
+              type="number"
               step="0.01"
               min="0.01"
               value={quantity}
@@ -72,13 +71,13 @@ export const StockEntry: React.FC = () => {
             />
           </div>
 
-          {/* Coste Base Unitario (Opcional) */}
           <div>
-            <label className="block text-sm font-semibold text-text-muted mb-1.5 ml-1">
+            <label htmlFor="entry-cost" className="block text-sm font-semibold text-text-muted mb-1.5 ml-1">
               Costo Unitario Nuevo (Opcional, $)
             </label>
-            <input 
-              type="number" 
+            <input
+              id="entry-cost"
+              type="number"
               step="0.01"
               min="0"
               value={costPrice}
@@ -89,19 +88,13 @@ export const StockEntry: React.FC = () => {
             <p className="text-xs text-text-muted mt-2 ml-1">Si el proveedor cambió el precio, actualízalo aquí.</p>
           </div>
 
-          <button 
+          <button
             type="submit"
-            className="w-full py-4 mt-2 bg-coffee-brown hover:bg-coffee-dark text-white rounded-2xl font-semibold transition-all active:scale-95 shadow-[0_4px_12px_rgba(92,61,46,0.2)] flex justify-center items-center gap-2"
+            className="w-full py-4 mt-2 bg-coffee-brown hover:bg-coffee-dark text-white rounded-2xl font-semibold transition-all active:scale-95 shadow-[0_4px_12px_rgba(92,61,46,0.2)] flex justify-center items-center gap-2 min-h-[48px]"
           >
             <Save size={20} />
             Guardar Entrada
           </button>
-
-          {successMsg && (
-            <div className="p-3 bg-accent-red-bg text-accent-green rounded-xl text-center text-sm font-semibold border border-wood-light">
-              {successMsg}
-            </div>
-          )}
         </form>
       </div>
     </div>

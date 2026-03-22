@@ -9,12 +9,22 @@
   --color-coffee-brown: #5C3D2E;
   --color-coffee-dark: #382218;
   --color-text-muted: #8A7363;
-  /* Alertas */
+  /* Alertas — Rojo */
   --color-accent-red: #D9534F;
   --color-accent-red-light: #FDE8E7;
   --color-accent-red-bg: #FFF9F8;
   --color-accent-red-border: #F8D7D6;
   --color-accent-red-btn: #E2B2B1;
+  /* Éxito — Verde */
+  --color-accent-green: #2E7D4F;
+  --color-accent-green-light: #E6F4EC;
+  --color-accent-green-bg: #F0FFF5;
+  /* Sync — Ámbar */
+  --color-accent-amber: #D97706;
+  --color-accent-amber-light: #FEF3C7;
+  /* Offline — Gris */
+  --color-accent-gray: #6B7280;
+  --color-accent-gray-light: #F3F4F6;
 
   /* Custom fonts */
   --font-serif: "Merriweather", "Georgia", serif;
@@ -28,3 +38,43 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Toast animation */
+@keyframes toast-in {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-out {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.3s ease-out forwards;
+}
+
+.animate-toast-out {
+  animation: toast-out 0.3s ease-in forwards;
+}
+
+/* Sync indicator pulse */
+@keyframes sync-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-sync-pulse {
+  animation: sync-pulse 1.5s ease-in-out infinite;
+}
