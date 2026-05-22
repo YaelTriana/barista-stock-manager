@@ -12,6 +12,11 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "xlsx": ["node_modules/xlsx/types/index.d.ts"]
+    },
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
