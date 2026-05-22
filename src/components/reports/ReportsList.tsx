@@ -4,6 +4,8 @@ import {
   Download, TrendingUp, TrendingDown, ChevronDown, ChevronRight,
   BarChart3, List, User, Tag,
 } from 'lucide-react';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore -- xlsx CJS package not resolved by tsc bundler mode on Vercel CI
 import * as XLSX from 'xlsx';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useCurrentUser } from '../../contexts/UserContext';
