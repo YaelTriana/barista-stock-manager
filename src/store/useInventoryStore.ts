@@ -14,26 +14,41 @@ import {
 } from '../lib/sync';
 import type { Product } from '../schemas/product';
 import type { Movement } from '../schemas/movement';
+import type { UserRole } from '../schemas/user';
 
 type SyncStatus = 'synced' | 'pending' | 'syncing' | 'offline' | 'error';
-type ActiveTab = 'inventory' | 'entry' | 'reports';
+type ActiveTab = 'inventory' | 'entry' | 'outputs' | 'reports';
+
+/** Returns today's date as "YYYY-MM-DD" */
+function todayStr(): string {
+  return new Date().toISOString().substring(0, 10);
+}
 
 interface InventoryState {
   // Data
   products: Product[];
   movements: Movement[];
 
+  // Inventory lock — prevents product deletion after entries are confirmed today
+  inventoryLockedDate: string | null;
+
   // UI state (not persisted)
   syncStatus: SyncStatus;
   activeTab: ActiveTab;
   isOnline: boolean;
   toastMessage: string | null;
+  currentUserRole: UserRole | null;
 
-  // Actions
+  // ─── ACTIONS ───
   addProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
-  updateStock: (id: string, delta: number, recordMovement?: boolean) => void;
-  registerEntry: (id: string, quantity: number, costOverwrite?: number) => void;
+  updateStock: (id: string, delta: number, recordMovement?: boolean, registeredBy?: string) => void;
+  registerEntry: (id: string, quantity: number, costOverwrite?: number, registeredBy?: string) => void;
+  registerOutputs: (outputs: { productId: string; quantity: number }[], registeredBy?: string) => void;
+
+  // Inventory lock
+  lockInventoryForDay: () => void;
+  isInventoryLockedToday: () => boolean;
 
   // UI actions
   setActiveTab: (tab: ActiveTab) => void;
@@ -41,6 +56,7 @@ interface InventoryState {
   setOnline: (online: boolean) => void;
   showToast: (message: string) => void;
   clearToast: () => void;
+  setCurrentUserRole: (role: UserRole | null) => void;
 
   // Sync actions
   syncFromRemote: () => Promise<void>;
@@ -54,10 +70,20 @@ export const useInventoryStore = create<InventoryState>()(
       // Initial state
       products: [],
       movements: [],
+      inventoryLockedDate: null,
       syncStatus: 'synced' as SyncStatus,
       activeTab: 'inventory' as ActiveTab,
       isOnline: navigator.onLine,
       toastMessage: null,
+      currentUserRole: null,
+
+      // ─── INVENTORY LOCK ───
+
+      lockInventoryForDay: () => set({ inventoryLockedDate: todayStr() }),
+
+      isInventoryLockedToday: () => {
+        return get().inventoryLockedDate === todayStr();
+      },
 
       // ─── PRODUCT ACTIONS ───
 
@@ -79,6 +105,12 @@ export const useInventoryStore = create<InventoryState>()(
       },
 
       deleteProduct: (id) => {
+        // Safety check: cannot delete if inventory is locked today
+        if (get().isInventoryLockedToday()) {
+          get().showToast('No se puede eliminar: el inventario fue confirmado hoy.');
+          return;
+        }
+
         set((state) => ({
           products: state.products.filter((p) => p.id !== id),
           movements: state.movements.filter((m) => m.productId !== id),
@@ -98,7 +130,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
 
-      updateStock: (id, delta, recordMovement = true) => {
+      updateStock: (id, delta, recordMovement = true, registeredBy) => {
         set((state) => {
           const product = state.products.find((p) => p.id === id);
           if (!product) return state;
@@ -117,10 +149,11 @@ export const useInventoryStore = create<InventoryState>()(
                   quantity: Math.abs(actualDelta),
                   date: new Date().toISOString(),
                   cost: product.costPrice * Math.abs(actualDelta),
+                  registeredBy,
+                  category: product.category,
                 }
               : null;
 
-          // Queue sync
           const { isOnline } = get();
           if (isOnline) {
             pushProduct(updatedProduct).catch(() => {
@@ -145,7 +178,7 @@ export const useInventoryStore = create<InventoryState>()(
         });
       },
 
-      registerEntry: (id, quantity, costOverwrite) => {
+      registerEntry: (id, quantity, costOverwrite, registeredBy) => {
         set((state) => {
           const product = state.products.find((p) => p.id === id);
           if (!product || quantity <= 0) return state;
@@ -166,9 +199,10 @@ export const useInventoryStore = create<InventoryState>()(
             quantity,
             date: new Date().toISOString(),
             cost: appliedCost * quantity,
+            registeredBy,
+            category: product.category,
           };
 
-          // Queue sync
           const { isOnline } = get();
           if (isOnline) {
             pushProduct(updatedProduct).catch(() => {
@@ -187,6 +221,67 @@ export const useInventoryStore = create<InventoryState>()(
             movements: [newMovement, ...state.movements],
           };
         });
+
+        // Lock inventory for the day after registering entries
+        get().lockInventoryForDay();
+      },
+
+      registerOutputs: (outputs, registeredBy) => {
+        const now = new Date().toISOString();
+        const { isOnline } = get();
+
+        set((state) => {
+          const newMovements: Movement[] = [];
+          let updatedProducts = [...state.products];
+
+          for (const { productId, quantity } of outputs) {
+            if (quantity <= 0) continue;
+            const idx = updatedProducts.findIndex(p => p.id === productId);
+            if (idx === -1) continue;
+
+            const product = updatedProducts[idx]!;
+            const newQty = Math.max(0, parseFloat((product.currentQuantity - quantity).toFixed(2)));
+            const actualQty = parseFloat((product.currentQuantity - newQty).toFixed(2));
+            if (actualQty <= 0) continue;
+
+            const updatedProduct = { ...product, currentQuantity: newQty };
+            updatedProducts = updatedProducts.map((p, i) => i === idx ? updatedProduct : p);
+
+            const movement: Movement = {
+              id: crypto.randomUUID(),
+              productId,
+              productName: product.name,
+              type: 'out' as const,
+              quantity: actualQty,
+              date: now,
+              cost: product.costPrice * actualQty,
+              registeredBy,
+              category: product.category,
+            };
+            newMovements.push(movement);
+
+            // Queue sync
+            if (isOnline) {
+              pushProduct(updatedProduct).catch(() =>
+                queueChange({ id: updatedProduct.id, table: 'products', action: 'upsert', data: updatedProduct })
+              );
+              pushMovement(movement).catch(() =>
+                queueChange({ id: movement.id, table: 'movements', action: 'upsert', data: movement })
+              );
+            } else {
+              queueChange({ id: updatedProduct.id, table: 'products', action: 'upsert', data: updatedProduct });
+              queueChange({ id: movement.id, table: 'movements', action: 'upsert', data: movement });
+            }
+          }
+
+          return {
+            products: updatedProducts,
+            movements: [...newMovements, ...state.movements],
+          };
+        });
+
+        // Lock inventory for the day
+        get().lockInventoryForDay();
       },
 
       // ─── UI ACTIONS ───
@@ -194,11 +289,10 @@ export const useInventoryStore = create<InventoryState>()(
       setActiveTab: (tab) => set({ activeTab: tab }),
       setSyncStatus: (status) => set({ syncStatus: status }),
       setOnline: (online) => set({ isOnline: online }),
+      setCurrentUserRole: (role) => set({ currentUserRole: role }),
       showToast: (message) => {
         set({ toastMessage: message });
-        setTimeout(() => {
-          set({ toastMessage: null });
-        }, 3500);
+        setTimeout(() => set({ toastMessage: null }), 3500);
       },
       clearToast: () => set({ toastMessage: null }),
 
@@ -245,14 +339,8 @@ export const useInventoryStore = create<InventoryState>()(
 
       startRealtime: () => {
         const unsubscribe = subscribeToRealtime(
-          () => {
-            // On product change from another device
-            get().syncFromRemote();
-          },
-          () => {
-            // On movement change from another device
-            get().syncFromRemote();
-          }
+          () => get().syncFromRemote(),
+          () => get().syncFromRemote()
         );
         return unsubscribe;
       },
@@ -263,6 +351,7 @@ export const useInventoryStore = create<InventoryState>()(
       partialize: (state) => ({
         products: state.products,
         movements: state.movements,
+        inventoryLockedDate: state.inventoryLockedDate,
       }),
     }
   )

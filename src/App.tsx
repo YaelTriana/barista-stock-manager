@@ -3,28 +3,28 @@ import { SecurityGate } from './components/auth/SecurityGate';
 import { MainLayout } from './components/layout/MainLayout';
 import { InventoryList } from './components/inventory/InventoryList';
 import { StockEntry } from './components/inventory/StockEntry';
+import { DailyOutputs } from './components/inventory/DailyOutputs';
 import { ReportsList } from './components/reports/ReportsList';
 import { useSession } from './hooks/useSession';
 import { useIdleTimer } from './hooks/useIdleTimer';
 import { useInventoryStore } from './store/useInventoryStore';
+import { UserProvider } from './contexts/UserContext';
 import { setSyncKey, clearSyncKey } from './lib/sync';
-import { deriveKey } from './lib/crypto';
-import { setEncryptionKey, clearEncryptionKey } from './lib/encryptedStorage';
+import { clearEncryptionKey } from './lib/encryptedStorage';
+import type { AppUser } from './schemas/user';
 
 function App() {
-  const { isAuthenticated, unlock, logout } = useSession();
+  const { isAuthenticated, currentUser, masterKey, unlock, logout } = useSession();
   const activeTab = useInventoryStore((s) => s.activeTab);
   const setOnline = useInventoryStore((s) => s.setOnline);
   const syncFromRemote = useInventoryStore((s) => s.syncFromRemote);
   const flushPending = useInventoryStore((s) => s.flushPending);
   const startRealtime = useInventoryStore((s) => s.startRealtime);
 
-  // Handle unlock: derive key, set in all modules, sync from remote
-  const handleUnlock = useCallback(async (pin: string, salt: string) => {
-    const key = await deriveKey(pin, salt);
-    setEncryptionKey(key);
-    setSyncKey(key);
-    await unlock(pin, salt);
+  /** Called by SecurityGate after successful login */
+  const handleUnlock = useCallback(async (mk: CryptoKey, user: AppUser) => {
+    setSyncKey(mk);
+    await unlock(mk, user);
 
     // Initial sync from Supabase after unlock
     setTimeout(() => {
@@ -32,7 +32,7 @@ function App() {
     }, 100);
   }, [unlock, syncFromRemote]);
 
-  // Handle logout: clear all keys
+  /** Clear all keys and session on logout */
   const handleLogout = useCallback(() => {
     clearSyncKey();
     clearEncryptionKey();
@@ -62,7 +62,6 @@ function App() {
   // Supabase Realtime subscription
   useEffect(() => {
     if (!isAuthenticated) return;
-
     const unsubscribe = startRealtime();
     return () => unsubscribe();
   }, [isAuthenticated, startRealtime]);
@@ -70,14 +69,22 @@ function App() {
   return (
     <SecurityGate
       onUnlock={handleUnlock}
-      onLogout={handleLogout}
       isAuthenticated={isAuthenticated}
     >
-      <MainLayout onLogout={handleLogout}>
-        {activeTab === 'inventory' && <InventoryList />}
-        {activeTab === 'entry' && <StockEntry />}
-        {activeTab === 'reports' && <ReportsList />}
-      </MainLayout>
+      {/* Provide user context to all child components */}
+      <UserProvider
+        username={currentUser?.username ?? ''}
+        role={currentUser?.role ?? 'viewer'}
+        userId={currentUser?.id ?? ''}
+        masterKey={masterKey}
+      >
+        <MainLayout onLogout={handleLogout}>
+          {activeTab === 'inventory' && <InventoryList />}
+          {activeTab === 'entry' && <StockEntry />}
+          {activeTab === 'outputs' && <DailyOutputs />}
+          {activeTab === 'reports' && <ReportsList />}
+        </MainLayout>
+      </UserProvider>
     </SecurityGate>
   );
 }

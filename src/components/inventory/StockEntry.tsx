@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { PackagePlus, Save } from 'lucide-react';
 import { useInventoryStore } from '../../store/useInventoryStore';
+import { useCurrentUser } from '../../contexts/UserContext';
 
 export const StockEntry: React.FC = () => {
   const products = useInventoryStore((s) => s.products);
   const registerEntry = useInventoryStore((s) => s.registerEntry);
   const showToast = useInventoryStore((s) => s.showToast);
+  const { username } = useCurrentUser();
 
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -20,7 +22,7 @@ export const StockEntry: React.FC = () => {
     const qtyNumber = parseFloat(quantity);
     const costNumber = costPrice ? parseFloat(costPrice) : undefined;
 
-    registerEntry(selectedProductId, qtyNumber, costNumber);
+    registerEntry(selectedProductId, qtyNumber, costNumber, username);
 
     setQuantity('');
     setCostPrice('');
