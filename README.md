@@ -196,9 +196,7 @@ stateDiagram-v2
 > **Master Key envuelta por usuario:** Los datos se cifran una sola vez con una Master Key compartida. Cada usuario guarda su propia copia *envuelta* con su Wrapping Key derivada de su PIN. Así se puede agregar/quitar usuarios y cambiar PINs **sin re-cifrar todo el inventario**.
 
 ### Limitaciones conocidas
-
-> ⚠️ **Sin auditoría de accesos** — no hay log de quién entró ni desde dónde.  
-> ⚠️ **Sin 2FA** — un solo factor de autenticación (usuario + PIN).  
+ 
 > ⚠️ **RLS permisivo** — la privacidad real depende del cifrado AES-GCM del cliente; cualquiera con la `anon key` puede leer el ciphertext (sin poder descifrarlo).
 
 *Para el caso de uso de una cafetería local estas limitaciones son aceptables.*
