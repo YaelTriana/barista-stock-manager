@@ -8,7 +8,7 @@
 
 ![Vercel](https://img.shields.io/badge/Vercel-Deploy-black?logo=vercel)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript)
 ![Supabase](https://img.shields.io/badge/Supabase-Realtime-3ECF8E?logo=supabase)
 ![Tailwind](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss)
 
@@ -82,14 +82,16 @@
 
 ```mermaid
 flowchart TD
-    U([👤 Usuario]) --> |Ingresa PIN| SG[SecurityGate]
-    SG --> |PBKDF2 100k iter| CK[🔑 CryptoKey en memoria]
-    CK --> Z[Zustand Store]
+    U([👤 Usuario]) --> |Usuario + PIN| SG[SecurityGate]
+    SG --> |PBKDF2 100k iter| WK[🔐 Wrapping Key]
+    WK --> |unwrap| MK[🔑 Master Key en memoria]
+    MK --> Z[Zustand Store]
     Z --> |AES-GCM cifrado| LF[(localforage\nIndexedDB)]
     Z --> |AES-GCM cifrado| SB[(Supabase\nPostgreSQL)]
     SB --> |WebSocket Realtime| OD([📱 Otro dispositivo])
 
-    style CK fill:#5C3D2E,color:#FDF8F3
+    style WK fill:#8A7363,color:#FDF8F3
+    style MK fill:#5C3D2E,color:#FDF8F3
     style SB fill:#3ECF8E,color:#fff
     style LF fill:#C8A98B,color:#382218
 ```
@@ -189,7 +191,9 @@ stateDiagram-v2
 
 > **IV aleatorio por escritura:** Previene ataques de nonce reuse. Sin IV único, dos textos iguales producirían el mismo ciphertext.
 
-> **Salt en Supabase sin cifrar:** El salt no es secreto — su función es hacer que el mismo PIN derive claves distintas en distintas instalaciones. Guardarlo en Supabase permite que todos los dispositivos deriven la misma CryptoKey con el mismo PIN.
+> **Salt en Supabase sin cifrar:** El salt no es secreto — su función es hacer que el mismo PIN derive claves distintas en distintas instalaciones. Guardarlo en Supabase permite que todos los dispositivos deriven la misma *Wrapping Key* con el mismo PIN y puedan desenvolver la Master Key.
+
+> **Master Key envuelta por usuario:** Los datos se cifran una sola vez con una Master Key compartida. Cada usuario guarda su propia copia *envuelta* con su Wrapping Key derivada de su PIN. Así se puede agregar/quitar usuarios y cambiar PINs **sin re-cifrar todo el inventario**.
 
 ### Limitaciones conocidas
 
