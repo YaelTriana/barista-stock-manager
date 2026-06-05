@@ -23,7 +23,8 @@
 - [Setup local](#-setup-local)
 - [Deploy](#-deploy-en-vercel)
 - [Estructura del proyecto](#-estructura-del-proyecto)
-- [Reset de PIN](#-reset-de-pin)
+- [Gestión de usuarios](#-gestión-de-usuarios)
+- [Reset total](#-reset-total)
 
 ---
 
@@ -35,7 +36,9 @@
 | 🔒 **Privacy-First** | Datos cifrados AES-GCM antes de salir del dispositivo |
 | 📡 **Offline-First** | Funciona sin conexión, sincroniza al reconectar |
 | ⚡ **Tiempo real** | Cambios visibles en todos los dispositivos en < 1 segundo |
-| 🔑 **PIN local** | Autenticación sin cuentas, sin emails, sin contraseñas |
+| 👥 **Multi-usuario con roles** | Admin, Registrador y Lector — cada uno con permisos específicos |
+| 🔑 **Autenticación por PIN** | Sin cuentas externas, sin emails — solo usuario + PIN local |
+| 📊 **Export a Excel** | Reportes y salidas del día exportables a `.xlsx` |
 | 📦 **PWA instalable** | Se instala como app nativa en iOS y Android |
 
 ---
@@ -47,10 +50,11 @@
 | Tecnología | Versión | Uso |
 |-----------|---------|-----|
 | React | 19 | UI y componentes |
-| TypeScript | 5.9 (strict) | Tipado estricto |
+| TypeScript | 5.7 (strict) | Tipado estricto |
 | Tailwind CSS | v4 (CSS-first) | Estilos, sin `tailwind.config.js` |
 | Zustand | 5 | Estado global |
 | lucide-react | 0.577 | Iconografía |
+| xlsx | 0.18 | Export de reportes a Excel |
 
 ### Backend & Datos
 
@@ -112,36 +116,53 @@ sequenceDiagram
     S-->>D: Merge completado
 ```
 
-### Modelo de cifrado
+### Modelo de cifrado (multi-usuario con master key envuelta)
 
 ```mermaid
 flowchart LR
-    PIN[🔢 PIN] --> |SHA-256| H[Hash almacenado\nen Supabase]
-    PIN --> |PBKDF2\n100k iter| CK[🔑 CryptoKey\nen memoria]
-    SALT[🧂 Salt único\nen Supabase] --> |input| CK
-    CK --> |AES-GCM\nIV aleatorio| CT[🔒 Ciphertext\nen Supabase]
+    PIN[🔢 PIN usuario] --> |SHA-256| H[Hash almacenado\nen Supabase]
+    PIN --> |PBKDF2\n100k iter| WK[🔐 Wrapping Key\nen memoria]
+    SALT[🧂 Salt único\nen Supabase] --> |input| WK
+    WK --> |AES-GCM unwrap| MK[🔑 Master Key\nen memoria]
+    WMK[(🎁 wrappedKey\nen Supabase por usuario)] --> |input| MK
+    MK --> |AES-GCM\nIV aleatorio| CT[🔒 Ciphertext\nen Supabase]
     CT --> |AES-GCM\ndescifra| DATA[📦 Datos\nen Zustand]
 
-    style CK fill:#5C3D2E,color:#FDF8F3
+    style WK fill:#8A7363,color:#FDF8F3
+    style MK fill:#5C3D2E,color:#FDF8F3
     style CT fill:#382218,color:#FDF8F3
     style DATA fill:#6B8E23,color:#fff
 ```
+
+> 💡 La **Master Key** cifra todos los datos y es la misma para todos los usuarios.
+> Cada usuario tiene su propia copia *envuelta* (cifrada) con una clave derivada de su PIN.
+> Cambiar el PIN de un usuario solo re-envuelve su copia — los datos no se re-cifran.
 
 ### Estados de autenticación
 
 ```mermaid
 stateDiagram-v2
     [*] --> loading: App arranca
-    loading --> setup: Sin config en Supabase + hay conexión
-    loading --> locked: Config encontrada
-    loading --> offline_setup: Sin config + sin conexión
-    setup --> unlocked: PIN confirmado ✓
-    locked --> unlocked: PIN correcto ✓
+    loading --> fresh: Sin salt en Supabase
+    loading --> migration: Sistema antiguo (single-PIN) detectado
+    loading --> locked: Sistema multi-usuario configurado
+    fresh --> unlocked: Setup primer admin ✓
+    migration --> unlocked: PIN antiguo verificado → admin creado ✓
+    locked --> unlocked: Usuario + PIN correctos ✓
     locked --> locked_out: 5 intentos fallidos
     locked_out --> locked: Timeout expirado
     unlocked --> locked: 30 min inactividad
     unlocked --> locked: Logout manual
 ```
+
+### Roles y permisos
+
+| Acción | Admin | Registrador | Lector |
+|--------|:-----:|:-----------:|:------:|
+| Ver inventario y reportes | ✓ | ✓ | ✓ |
+| Registrar entradas / salidas | ✓ | ✓ | — |
+| Agregar / eliminar productos | ✓ | — | — |
+| Gestionar usuarios | ✓ | — | — |
 
 ---
 
@@ -173,8 +194,8 @@ stateDiagram-v2
 ### Limitaciones conocidas
 
 > ⚠️ **Sin auditoría de accesos** — no hay log de quién entró ni desde dónde.  
-> ⚠️ **PIN compartido** — todos los dispositivos usan el mismo PIN.  
-> ⚠️ **Sin 2FA** — un solo factor de autenticación.
+> ⚠️ **Sin 2FA** — un solo factor de autenticación (usuario + PIN).  
+> ⚠️ **RLS permisivo** — la privacidad real depende del cifrado AES-GCM del cliente; cualquiera con la `anon key` puede leer el ciphertext (sin poder descifrarlo).
 
 *Para el caso de uso de una cafetería local estas limitaciones son aceptables.*
 
@@ -289,34 +310,43 @@ barista-stock-manager/
 │       └── 001_initial.sql        # Schema inicial
 ├── src/
 │   ├── components/
+│   │   ├── admin/
+│   │   │   └── UserManagement.tsx # Panel admin: crear/eliminar usuarios, cambiar PIN
 │   │   ├── auth/
-│   │   │   └── SecurityGate.tsx   # Autenticación PIN
+│   │   │   └── SecurityGate.tsx   # Login, setup inicial y migración
 │   │   ├── inventory/
-│   │   │   └── InventoryList.tsx  # Pantalla de stock
+│   │   │   ├── InventoryList.tsx  # Pantalla de stock
+│   │   │   ├── AddProductModal.tsx # Alta de productos (solo admin)
+│   │   │   ├── StockEntry.tsx     # Registro de entradas
+│   │   │   └── DailyOutputs.tsx   # Salidas del día + export Excel
 │   │   ├── layout/
 │   │   │   └── MainLayout.tsx     # Navbar + layout
 │   │   ├── reports/
 │   │   │   └── ReportsList.tsx    # Pantalla de reportes
 │   │   └── ui/
 │   │       └── SyncIndicator.tsx  # Estado de conexión
+│   ├── contexts/
+│   │   └── UserContext.tsx        # Usuario actual + masterKey en memoria
 │   ├── hooks/
 │   │   ├── useIdleTimer.ts        # Expiración de sesión
 │   │   └── useSession.ts          # Estado de auth
 │   ├── lib/
-│   │   ├── crypto.ts              # Web Crypto API (AES-GCM, PBKDF2)
+│   │   ├── crypto.ts              # Web Crypto API (AES-GCM, PBKDF2, key wrapping)
 │   │   ├── encryptedStorage.ts    # Adapter Zustand + cifrado
 │   │   ├── supabase.ts            # Cliente Supabase
-│   │   └── sync.ts                # Cola offline + merge
+│   │   ├── sync.ts                # Cola offline + merge
+│   │   └── userAuth.ts            # Setup, login, CRUD usuarios, migración
 │   ├── schemas/
 │   │   ├── product.ts             # Zod schema Product
-│   │   └── movement.ts            # Zod schema Movement
+│   │   ├── movement.ts            # Zod schema Movement
+│   │   └── user.ts                # Zod schema AppUser + roles + permisos
 │   ├── store/
 │   │   └── useInventoryStore.ts   # Store principal Zustand 5
 │   ├── App.tsx
 │   └── index.css                  # Tema Tailwind v4 (@theme {})
 ├── AGENT_BRIEF.md                 # Prompt principal para Antigravity
-├── Dockerfile.dev                 # Imagen de desarrollo
-├── Dockerfile.prod                # Imagen de producción (multi-stage)
+├── dockerfile.dev                 # Imagen de desarrollo
+├── dockerfile.prod                # Imagen de producción (multi-stage)
 ├── docker-compose.yml             # Orquestación dev + prod
 ├── nginx.conf                     # SPA routing + headers seguridad
 ├── vercel.json                    # Headers CSP + SPA routing
@@ -325,22 +355,45 @@ barista-stock-manager/
 
 ---
 
-## 🔑 Reset de PIN
+## 👥 Gestión de usuarios
 
-> ⚠️ **Advertencia:** Resetear el PIN borra todos los datos del inventario. Los datos están cifrados con una clave derivada del PIN — sin el PIN original no hay forma de recuperarlos.
+El sistema soporta múltiples usuarios con roles distintos. Solo un **administrador** puede gestionar usuarios.
 
-Si necesitas cambiar el PIN, ejecuta en **Supabase Dashboard → SQL Editor**:
+### Crear el primer admin
+En el primer arranque la app detecta que no hay configuración y muestra la pantalla de **setup inicial**: define un nombre de usuario y un PIN para el administrador.
+
+### Agregar más usuarios
+Desde la app (logueado como admin):
+1. Abrir el **panel de administración** (menú → gestionar usuarios)
+2. **Agregar usuario** → nombre + rol (Registrador / Lector) + PIN inicial
+3. Compartir las credenciales con la persona
+
+### Cambiar el PIN de un usuario
+- Cada usuario puede cambiar su propio PIN.
+- El admin puede cambiar el PIN de cualquier usuario sin conocer el actual.
+- Al cambiar el PIN solo se re-envuelve la copia personal de la master key — **los datos no se re-cifran**.
+
+### Migración desde el sistema viejo (single-PIN)
+Si la instalación venía de la versión anterior con un único PIN compartido, la app detecta automáticamente esa configuración y muestra la pantalla de **migración**: ingresá el PIN viejo y se crea un usuario admin con ese PIN. Los datos existentes siguen siendo accesibles sin re-cifrar.
+
+---
+
+## 🔄 Reset total
+
+> ⚠️ **Advertencia:** Esto borra todos los datos del inventario. Los datos están cifrados con una clave derivada de los PINs — sin un PIN válido no hay forma de recuperarlos.
+
+Si perdiste todos los PINs o querés empezar desde cero, ejecutá en **Supabase Dashboard → SQL Editor**:
 
 ```sql
--- Borra configuración de auth (PIN hash + salt)
-DELETE FROM app_config WHERE key IN ('pin_hash', 'salt');
+-- Borra configuración (salt, lista de usuarios, PIN hash legacy)
+DELETE FROM app_config;
 
 -- Borra todos los datos cifrados (no recuperables)
 DELETE FROM movements;
 DELETE FROM products;
 ```
 
-Después de esto, la app entrará en modo **setup** y podrás configurar un nuevo PIN desde cero.
+Después de esto, la app entrará en modo **fresh setup** y podrás configurar un nuevo admin desde cero.
 
 ---
 
