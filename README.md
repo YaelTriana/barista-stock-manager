@@ -6,11 +6,18 @@
 
 <br>
 
+[![CI](https://github.com/YaelTriana/barista-stock-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/YaelTriana/barista-stock-manager/actions/workflows/ci.yml)
 ![Vercel](https://img.shields.io/badge/Vercel-Deploy-black?logo=vercel)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript)
 ![Supabase](https://img.shields.io/badge/Supabase-Realtime-3ECF8E?logo=supabase)
 ![Tailwind](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss)
+
+<p align="center">
+  <img src="docs/demo.gif" alt="Demo: alta de un insumo y registro de movimientos en Barista Stock Manager" width="320">
+  <br>
+  <a href="https://barista-stock-manager.vercel.app"><b>Probar la demo en vivo →</b></a>
+</p>
 
 ---
 
@@ -21,6 +28,7 @@
 - [Arquitectura](#-arquitectura)
 - [Seguridad](#-modelo-de-seguridad)
 - [Setup local](#-setup-local)
+- [Pruebas](#-pruebas)
 - [Deploy](#-deploy-en-vercel)
 - [Estructura del proyecto](#-estructura-del-proyecto)
 - [Gestión de usuarios](#-gestión-de-usuarios)
@@ -261,6 +269,24 @@ docker compose down --volumes --rmi local
 # Ver logs en tiempo real
 docker compose logs -f dev
 ```
+
+---
+
+## 🧪 Pruebas
+
+```bash
+npm test          # Vitest: cifrado, esquemas y permisos por rol
+npm run lint
+```
+
+Las pruebas cubren lo que más importa en esta app:
+
+- **Cifrado:** ida y vuelta AES-GCM, IV distinto en cada cifrado, rechazo de un PIN incorrecto y de datos alterados.
+- **Multi-usuario:** un segundo usuario puede desenvolver la llave maestra con su propio PIN, y nadie más.
+- **Validación:** los esquemas Zod limpian HTML/scripts y rechazan cantidades o precios negativos.
+- **Roles:** la matriz completa de permisos de Admin, Registrador y Lector.
+
+GitHub Actions corre lint, pruebas y build en cada push y pull request.
 
 ---
 

@@ -164,7 +164,8 @@ export const ReportsList: React.FC = () => {
   const toggleDay = (day: string) =>
     setExpandedDays(prev => {
       const next = new Set(prev);
-      next.has(day) ? next.delete(day) : next.add(day);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
       return next;
     });
 

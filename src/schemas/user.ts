@@ -24,7 +24,7 @@ export const PERMISSIONS = {
   canDeleteProduct: (role: UserRole) => role === 'admin',
   canRegisterEntry: (role: UserRole) => role === 'admin' || role === 'registrar',
   canRegisterOutput: (role: UserRole) => role === 'admin' || role === 'registrar',
-  canViewReports: (_role: UserRole) => true,
+  canViewReports: () => true,
   canManageUsers: (role: UserRole) => role === 'admin',
 } as const;
 
