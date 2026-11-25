@@ -13,6 +13,12 @@
 ![Supabase](https://img.shields.io/badge/Supabase-Realtime-3ECF8E?logo=supabase)
 ![Tailwind](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss)
 
+<p align="center">
+  <img src="docs/demo.gif" alt="Demo: alta de un insumo y registro de movimientos en Barista Stock Manager" width="320">
+  <br>
+  <a href="https://barista-stock-manager.vercel.app"><b>Probar la demo en vivo →</b></a>
+</p>
+
 ---
 
 ## 📋 Tabla de contenidos
